@@ -9,6 +9,8 @@ from langchain_tavily import TavilySearch
 from langgraph.prebuilt import ToolNode
 from langgraph.prebuilt import tools_condition
 
+from langgraph.checkpoint.memory import MemorySaver
+
 load_dotenv()
 
 # Graph State
@@ -36,16 +38,27 @@ graph_builder.add_conditional_edges("chatbot", tools_condition)
 
 # Edges
 graph_builder.add_edge("tools", "chatbot")
-graph_builder.add_edge(START, "chatbot")
+graph_builder.set_entry_point("chatbot")
 
-# Compile Graph
-graph = graph_builder.compile()
+# Compile Graph with memory
+memory = MemorySaver()
+graph = graph_builder.compile(checkpointer=memory)
+
+# Config 
+config = {"configurable": {"thread_id": "1"}}
 
 # Stream Graph updates
 def stream_graph_updates(user_input: str):
-    for event in graph.stream({"messages": [{ "role": "user", "content": user_input }]}):
-        for value in event.values():
-            print("Assistant:", value["messages"][-1].content)
+    # for event in graph.stream({"messages": [{ "role": "user", "content": user_input }]}):
+    #     for value in event.values():
+    #         print("Assistant:", value["messages"][-1].content)
+    events = graph.stream(
+        {"messages": [{"role": "user", "content": user_input}]},
+        config,
+        stream_mode="values"
+    )
+    for event in events:
+        event["messages"][-1].pretty_print()
 
 # Run Graph
 while True:
